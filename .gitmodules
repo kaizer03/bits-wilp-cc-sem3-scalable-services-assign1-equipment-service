@@ -1,0 +1,3 @@
+[submodule "services/booking"]
+	path = services/booking
+	url = https://github.com/kaizer03/bits-wilp-cc-sem3-scalable-services-assign1-booking-service.git

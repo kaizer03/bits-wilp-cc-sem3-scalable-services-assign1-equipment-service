@@ -42,7 +42,7 @@ services:
       timeout: 4s
       retries: 10
   booking:
-    build: ../bits-wilp-cc-sem3-scalable-services-assign1-booking-service
+    build: ./services/booking
     image: resource-desk/booking:1.0.0
     environment:
       PGHOST: booking-db

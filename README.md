@@ -22,17 +22,18 @@ flowchart LR
 
 ## Local deployment
 
-Requirements: Docker with Compose, Git, and sibling checkouts of both repositories.
+Requirements: Docker with Compose and Git. The booking service is included as a submodule, pinned to an independently versioned commit. A recursive clone retrieves the complete application.
 
 ```sh
-git clone https://github.com/kaizer03/bits-wilp-cc-sem3-scalable-services-assign1.git
-git clone https://github.com/kaizer03/bits-wilp-cc-sem3-scalable-services-assign1-booking-service.git
-cd bits-wilp-cc-sem3-scalable-services-assign1
+git clone --recurse-submodules https://github.com/kaizer03/bits-wilp-cc-sem3-scalable-services-assign1-equipment-service.git
+cd bits-wilp-cc-sem3-scalable-services-assign1-equipment-service
 printf 'EQUIPMENT_DB_PASSWORD=%s\nBOOKING_DB_PASSWORD=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > .env
 docker compose up -d --build --wait
 ```
 
 Interface and equipment API: <http://127.0.0.1:4180>. Direct booking API: <http://127.0.0.1:4181>. Database ports are not published. The initial catalogue contains five example assets. `docker compose stop` stops this application's containers and retains the data volumes.
+
+For an existing checkout, `git submodule update --init --recursive` retrieves the pinned booking service. Both services retain their own source repository, dependency lockfile, database schema, Dockerfile and tests.
 
 ## Kubernetes deployment
 
@@ -53,7 +54,7 @@ kubectl --context=resource-desk -n resource-desk create secret generic database-
   --from-literal=equipment-password="$EQUIPMENT_DB_PASSWORD" \
   --from-literal=booking-password="$BOOKING_DB_PASSWORD"
 kubectl --context=resource-desk apply -f deploy/kubernetes/
-kubectl --context=resource-desk apply -f ../bits-wilp-cc-sem3-scalable-services-assign1-booking-service/deploy/kubernetes/
+kubectl --context=resource-desk apply -f services/booking/deploy/kubernetes/
 kubectl --context=resource-desk -n resource-desk rollout status deployment/equipment
 kubectl --context=resource-desk -n resource-desk rollout status deployment/booking
 kubectl --context=resource-desk -n resource-desk port-forward service/equipment 14180:4180
@@ -105,6 +106,7 @@ db/                  Catalogue schema and initial assets
 test/                Equipment API tests
 deploy/kubernetes/   Equipment API and database resources
 postman/             API request collection
+services/booking/    Independently versioned booking service submodule
 ```
 
 ## Scope
