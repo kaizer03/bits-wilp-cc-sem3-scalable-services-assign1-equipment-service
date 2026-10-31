@@ -60,7 +60,14 @@ kubectl --context=resource-desk -n resource-desk rollout status deployment/booki
 kubectl --context=resource-desk -n resource-desk port-forward service/equipment 14180:4180
 ```
 
-The Kubernetes interface is available at <http://127.0.0.1:14180> while port forwarding runs. The deployment creates two application replicas per service and one persistent database per service. Database startup is awaited before application initialization. Health probes check each API and its own database.
+The Kubernetes interface is available at <http://127.0.0.1:14180> while port forwarding runs. The direct booking API can be exposed in another terminal:
+
+```sh
+export KUBECONFIG="$HOME/.kube/resource-desk.yaml"
+kubectl --context=resource-desk -n resource-desk port-forward service/booking 14181:4181
+```
+
+The deployment creates two application replicas per service and one persistent database per service. Database startup is awaited before application initialization. Health probes check each API and its own database.
 
 ```sh
 minikube -p resource-desk addons enable dashboard
@@ -84,7 +91,7 @@ The Minikube dashboard addon uses the archived Kubernetes Dashboard for this loc
 
 Asset registration accepts `assetTag`, `name`, `category`, `location`, and optional `description`. Asset tags are unique. Status updates accept `{"status":"maintenance"}` or `{"status":"operational"}`. Invalid input returns 400; unknown assets return 404; duplicate tags return 409.
 
-The interface forwards `/api/bookings` and `/api/availability` requests to the booking service. Direct service access is also supported. `X-Request-ID` correlates service logs; `X-Instance-ID` identifies the responding API instance. The Postman collection in `postman/` covers both services and uses the Kubernetes interface address by default.
+The interface forwards `/api/bookings` and `/api/availability` requests to the booking service. Direct service access is also supported. `X-Request-ID` correlates service logs; `X-Instance-ID` identifies the responding API instance. The Postman collection `BITS WILP CC Sem 3 Assign1` in `postman/` groups requests under Equipment Service and Booking Service, including catalogue, reservations, availability, validation, cancellation and health checks. `equipmentBaseUrl` defaults to `http://127.0.0.1:14180`; `bookingBaseUrl` defaults to `http://127.0.0.1:14181`. For Compose, use ports 4180 and 4181 respectively.
 
 ## Tests
 

@@ -1,0 +1,599 @@
+{
+  "info": {
+    "name": "BITS WILP CC Sem 3 Assign1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "26b383b6-4cb9-4765-a3e1-2cd36f480101",
+    "description": "Resource Desk APIs grouped by owning service. Equipment and booking services use independent base addresses."
+  },
+  "variable": [
+    {
+      "key": "equipmentBaseUrl",
+      "value": "http://127.0.0.1:14180"
+    },
+    {
+      "key": "bookingBaseUrl",
+      "value": "http://127.0.0.1:14181"
+    },
+    {
+      "key": "equipmentId",
+      "value": "58300000-0000-4000-8000-000000000001"
+    },
+    {
+      "key": "registeredEquipmentId",
+      "value": ""
+    },
+    {
+      "key": "bookingId",
+      "value": ""
+    },
+    {
+      "key": "bookingDate",
+      "value": ""
+    },
+    {
+      "key": "requestKey",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get(\"bookingDate\")) { const d=new Date(); d.setDate(d.getDate()+6); pm.collectionVariables.set(\"bookingDate\",d.toISOString().slice(0,10)); }",
+          "if (pm.info.requestName === \"Create reservation\" || !pm.collectionVariables.get(\"requestKey\")) pm.collectionVariables.set(\"requestKey\",pm.variables.replaceIn(\"{{$guid}}\"));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Equipment Service",
+      "item": [
+        {
+          "name": "Catalogue",
+          "item": [
+            {
+              "name": "List equipment",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{equipmentBaseUrl}}/api/equipment"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Catalogue is available\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Equipment details",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{equipmentBaseUrl}}/api/equipment/{{equipmentId}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Register equipment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{equipmentBaseUrl}}/api/equipment",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assetTag\": \"TEST-{{$timestamp}}\",\n  \"name\": \"Portable presentation screen\",\n  \"category\": \"Presentation\",\n  \"location\": \"Seminar room\",\n  \"description\": \"Portable screen for department meetings.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                      "if (pm.response.code === 201) pm.collectionVariables.set(\"registeredEquipmentId\",pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mark equipment under maintenance",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{equipmentBaseUrl}}/api/equipment/{{registeredEquipmentId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"maintenance\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Maintenance status\",()=>pm.expect(pm.response.json().status).to.eql(\"maintenance\"));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Restore equipment to operational",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{equipmentBaseUrl}}/api/equipment/{{registeredEquipmentId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"operational\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Operational status\",()=>pm.expect(pm.response.json().status).to.eql(\"operational\"));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Health",
+          "item": [
+            {
+              "name": "Equipment liveness",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{equipmentBaseUrl}}/health/live"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Equipment database readiness",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{equipmentBaseUrl}}/health/ready"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Booking Service",
+      "item": [
+        {
+          "name": "Reservations",
+          "item": [
+            {
+              "name": "Create reservation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{requestKey}}"
+                  }
+                ],
+                "url": "{{bookingBaseUrl}}/api/bookings",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"equipmentId\": \"{{equipmentId}}\",\n  \"date\": \"{{bookingDate}}\",\n  \"slot\": \"AM\",\n  \"requester\": \"Asha Sen\",\n  \"purpose\": \"Department review meeting\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Reservation created or replayed\", () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                      "if ([200,201].includes(pm.response.code)) pm.collectionVariables.set(\"bookingId\",pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Read reservation",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{bookingBaseUrl}}/api/bookings/{{bookingId}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List reservations",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{bookingBaseUrl}}/api/bookings"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Reservation list\",()=>pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List reservations by date",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{bookingBaseUrl}}/api/bookings?date={{bookingDate}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Reservation list\",()=>pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Availability",
+          "item": [
+            {
+              "name": "Availability",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{bookingBaseUrl}}/api/availability?date={{bookingDate}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Validation",
+          "item": [
+            {
+              "name": "Replay reservation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{requestKey}}"
+                  }
+                ],
+                "url": "{{bookingBaseUrl}}/api/bookings",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"equipmentId\": \"{{equipmentId}}\",\n  \"date\": \"{{bookingDate}}\",\n  \"slot\": \"AM\",\n  \"requester\": \"Asha Sen\",\n  \"purpose\": \"Department review meeting\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Same reservation returned\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Replay header\",()=>pm.expect(pm.response.headers.get(\"Idempotency-Replayed\")).to.eql(\"true\"));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Competing reservation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{bookingBaseUrl}}/api/bookings",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"equipmentId\": \"{{equipmentId}}\",\n  \"date\": \"{{bookingDate}}\",\n  \"slot\": \"AM\",\n  \"requester\": \"Ravi Das\",\n  \"purpose\": \"Department review meeting\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Slot conflict\", () => pm.response.to.have.status(409));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Maintenance rejection",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{bookingBaseUrl}}/api/bookings",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"equipmentId\": \"58300000-0000-4000-8000-000000000004\",\n  \"date\": \"{{bookingDate}}\",\n  \"slot\": \"AM\",\n  \"requester\": \"Asha Sen\",\n  \"purpose\": \"Department review meeting\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Maintenance blocks reservation\", () => pm.response.to.have.status(409));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Reject a past booking date",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{bookingBaseUrl}}/api/bookings",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"equipmentId\": \"{{equipmentId}}\",\n  \"date\": \"2020-01-01\",\n  \"slot\": \"AM\",\n  \"requester\": \"Asha Sen\",\n  \"purpose\": \"Department review meeting\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cancellation",
+          "item": [
+            {
+              "name": "Cancel reservation",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{bookingBaseUrl}}/api/bookings/{{bookingId}}/cancel",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Reservation cancelled\",()=>pm.expect(pm.response.json().status).to.eql(\"cancelled\"));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Health",
+          "item": [
+            {
+              "name": "Booking liveness",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{bookingBaseUrl}}/health/live"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Booking database readiness",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{bookingBaseUrl}}/health/ready"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
