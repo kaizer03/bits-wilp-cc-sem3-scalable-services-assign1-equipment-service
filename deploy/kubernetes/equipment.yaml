@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: equipment
+  namespace: resource-desk
+spec:
+  selector: {app: equipment}
+  ports: [{port: 4180, targetPort: 4180}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: equipment
+  namespace: resource-desk
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: equipment}
+  template:
+    metadata:
+      labels: {app: equipment}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      initContainers:
+        - name: wait-for-database
+          image: postgres:17-alpine
+          command: [sh, -c, "until pg_isready -h equipment-db -U equipment -d equipment; do sleep 2; done"]
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+      containers:
+        - name: equipment
+          image: resource-desk/equipment:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 4180}]
+          env:
+            - {name: PGHOST, value: equipment-db}
+            - {name: PGUSER, value: equipment}
+            - {name: PGDATABASE, value: equipment}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: database-credentials, key: equipment-password}
+            - {name: BOOKING_SERVICE_URL, value: 'http://booking:4181'}
+          readinessProbe:
+            httpGet: {path: /health/ready, port: 4180}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health/live, port: 4180}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 192Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}

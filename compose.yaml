@@ -1,0 +1,63 @@
+name: resource-desk
+services:
+  equipment-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: equipment
+      POSTGRES_DB: equipment
+      POSTGRES_PASSWORD: ${EQUIPMENT_DB_PASSWORD:?Set EQUIPMENT_DB_PASSWORD in .env}
+    volumes: [equipment-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U equipment -d equipment"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  booking-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: booking
+      POSTGRES_DB: booking
+      POSTGRES_PASSWORD: ${BOOKING_DB_PASSWORD:?Set BOOKING_DB_PASSWORD in .env}
+    volumes: [booking-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U booking -d booking"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  equipment:
+    build: .
+    image: resource-desk/equipment:1.0.0
+    environment:
+      PGHOST: equipment-db
+      PGUSER: equipment
+      PGDATABASE: equipment
+      PGPASSWORD: ${EQUIPMENT_DB_PASSWORD}
+      BOOKING_SERVICE_URL: http://booking:4181
+    ports: ["127.0.0.1:4180:4180"]
+    depends_on:
+      equipment-db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:4180/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 4s
+      retries: 10
+  booking:
+    build: ../bits-wilp-cc-sem3-scalable-services-assign1-booking-service
+    image: resource-desk/booking:1.0.0
+    environment:
+      PGHOST: booking-db
+      PGUSER: booking
+      PGDATABASE: booking
+      PGPASSWORD: ${BOOKING_DB_PASSWORD}
+      EQUIPMENT_SERVICE_URL: http://equipment:4180
+    ports: ["127.0.0.1:4181:4181"]
+    depends_on:
+      booking-db: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:4181/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 4s
+      retries: 10
+volumes:
+  equipment-data:
+  booking-data:
