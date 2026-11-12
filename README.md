@@ -128,7 +128,7 @@ npm ci
 TEST_DATABASE_URL=postgres://postgres:password@127.0.0.1:5432/equipment_test npm test
 ```
 
-Tests cover persisted catalogue entries, unique asset tags, invalid input, maintenance status and catalogue availability during a booking-service outage. They create test records only in the configured test database.
+Tests cover persisted catalogue entries, unique asset tags, invalid input, maintenance status and catalogue availability during a booking-service outage. They create test records only in the configured test database. Eight additional tests cover Postman date rollover, invalid dates and retry keys in a sandbox without Intl.
 
 ## Structure
 
