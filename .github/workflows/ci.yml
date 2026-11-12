@@ -1,0 +1,70 @@
+name: Service checks and images
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: equipment
+            path: .
+          - service: booking
+            path: services/booking
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: service_test
+          POSTGRES_PASSWORD: ci-local-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d service_test"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        working-directory: ${{ matrix.path }}
+        run: npm ci
+      - name: Run API tests
+        working-directory: ${{ matrix.path }}
+        env:
+          TEST_DATABASE_URL: postgres://postgres:ci-local-only@localhost:5432/service_test
+        run: npm test
+      - name: Build container image
+        env:
+          SERVICE: ${{ matrix.service }}
+          BUILD_PATH: ${{ matrix.path }}
+        run: |
+          docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            -t "resource-desk/$SERVICE:ci-${GITHUB_SHA:0:12}" "$BUILD_PATH"
+      - name: Export tested image
+        if: github.event_name != 'pull_request'
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          mkdir -p image
+          docker save "resource-desk/$SERVICE:ci-${GITHUB_SHA:0:12}" | gzip -1 > image/image.tar.gz
+          (cd image && sha256sum image.tar.gz > image.sha256)
+          printf '%s\n' "$GITHUB_SHA" > image/revision.txt
+          printf '%s\n' "$SERVICE" > image/service.txt
+      - uses: actions/upload-artifact@v7
+        if: github.event_name != 'pull_request'
+        with:
+          name: ${{ matrix.service }}-image
+          path: image/
+          retention-days: 7
+          compression-level: 0

@@ -41,8 +41,23 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "if (!pm.collectionVariables.get(\"bookingDate\")) { const d=new Date(); d.setDate(d.getDate()+6); pm.collectionVariables.set(\"bookingDate\",d.toISOString().slice(0,10)); }",
-          "if (pm.info.requestName === \"Create reservation\" || !pm.collectionVariables.get(\"requestKey\")) pm.collectionVariables.set(\"requestKey\",pm.variables.replaceIn(\"{{$guid}}\"));"
+          "const zone = \"Asia/Kolkata\";",
+          "const formatDate = date => new Intl.DateTimeFormat(\"en-CA\", { timeZone: zone }).format(date);",
+          "const today = formatDate(new Date());",
+          "const selectedDate = pm.collectionVariables.get(\"bookingDate\");",
+          "const parsedDate = new Date(`${selectedDate}T12:00:00+05:30`);",
+          "const validDate = /^\\d{4}-\\d{2}-\\d{2}$/.test(selectedDate || \"\")",
+          "  && Number.isFinite(parsedDate.getTime())",
+          "  && formatDate(parsedDate) === selectedDate;",
+          "",
+          "if (!validDate || selectedDate < today) {",
+          "  const nextDate = new Date(Date.now() + 6 * 86400000);",
+          "  pm.collectionVariables.set(\"bookingDate\", formatDate(nextDate));",
+          "}",
+          "",
+          "if (pm.info.requestName === \"Create reservation\" || !pm.collectionVariables.get(\"requestKey\")) {",
+          "  pm.collectionVariables.set(\"requestKey\", pm.variables.replaceIn(\"{{$guid}}\"));",
+          "}"
         ]
       }
     }

@@ -27,13 +27,18 @@ Requirements: Docker with Compose and Git. The booking service is included as a 
 ```sh
 git clone --recurse-submodules https://github.com/kaizer03/bits-wilp-cc-sem3-scalable-services-assign1-equipment-service.git
 cd bits-wilp-cc-sem3-scalable-services-assign1-equipment-service
-printf 'EQUIPMENT_DB_PASSWORD=%s\nBOOKING_DB_PASSWORD=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > .env
+if [ ! -e .env ]; then
+  (umask 077; printf 'EQUIPMENT_DB_PASSWORD=%s\nBOOKING_DB_PASSWORD=%s\n' \
+    "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > .env)
+fi
 docker compose up -d --build --wait
 ```
 
 Interface and equipment API: <http://127.0.0.1:4180>. Direct booking API: <http://127.0.0.1:4181>. Database ports are not published. The initial catalogue contains five example assets. `docker compose stop` stops this application's containers and retains the data volumes.
 
-For an existing checkout, `git submodule update --init --recursive` retrieves the pinned booking service. Both services retain their own source repository, dependency lockfile, database schema, Dockerfile and tests.
+An existing checkout uses `git submodule update --init --recursive` to retrieve Booking. Each service keeps its own dependencies, schema, Dockerfile and tests. The existing `.env` must be retained when database volumes are reused.
+
+After a normal stop, `docker compose up -d --wait` starts the same containers and data. A source change requires `docker compose up -d --build --wait`.
 
 ## Kubernetes deployment
 
@@ -50,15 +55,21 @@ kubectl --context=resource-desk apply -f deploy/kubernetes/namespace.yaml
 set -a
 . ./.env
 set +a
-kubectl --context=resource-desk -n resource-desk create secret generic database-credentials \
-  --from-literal=equipment-password="$EQUIPMENT_DB_PASSWORD" \
-  --from-literal=booking-password="$BOOKING_DB_PASSWORD"
+if ! kubectl --context=resource-desk -n resource-desk get secret database-credentials >/dev/null 2>&1; then
+  : "${EQUIPMENT_DB_PASSWORD:?Missing equipment password}"
+  : "${BOOKING_DB_PASSWORD:?Missing booking password}"
+  kubectl --context=resource-desk -n resource-desk create secret generic database-credentials \
+    --from-literal=equipment-password="$EQUIPMENT_DB_PASSWORD" \
+    --from-literal=booking-password="$BOOKING_DB_PASSWORD"
+fi
 kubectl --context=resource-desk apply -f deploy/kubernetes/
 kubectl --context=resource-desk apply -f services/booking/deploy/kubernetes/
 kubectl --context=resource-desk -n resource-desk rollout status deployment/equipment
 kubectl --context=resource-desk -n resource-desk rollout status deployment/booking
 kubectl --context=resource-desk -n resource-desk port-forward service/equipment 14180:4180
 ```
+
+A stopped cluster can be restarted with the same `KUBECONFIG` and `minikube start` command above. `minikube -p resource-desk update-context` refreshes its local API address. Existing deployments, credentials and persistent data are retained; image loading and manifest application are needed only for a new deployment or an update. Port forwarding must be started again after a restart. Reapplying the API manifests restores their declared two replicas.
 
 The Kubernetes interface is available at <http://127.0.0.1:14180> while port forwarding runs. The direct booking API can be exposed in another terminal:
 
@@ -78,6 +89,21 @@ kubectl --context=resource-desk -n resource-desk scale deployment/booking --repl
 
 The Minikube dashboard addon uses the archived Kubernetes Dashboard for this local exercise. It must remain locally accessible. Application replicas on one local node do not provide host-level fault tolerance; database replication is outside this implementation.
 
+## Build and delivery
+
+Both repositories run GitHub Actions checks on pushes to `main` and pull requests. Each service is tested against a temporary PostgreSQL database before its ARM64 image is built. The equipment workflow checks the pinned Booking submodule as well and saves both images as seven-day build artifacts. Pull requests run checks without creating delivery artifacts.
+
+Local delivery has a manual start because Minikube is private to this Mac. It downloads the two images from one successful equipment-repository run, checks their archive hashes and source revision, loads them into Minikube and updates the API deployments. Failed rollout or readiness checks restore the previous images. Existing replica counts and databases are retained.
+
+Requirements: an initialized `resource-desk` cluster, GitHub CLI signed in with repository access, Docker, Minikube and kubectl. The checkout must be clean and match the run's `main` commit.
+
+```sh
+gh run list --workflow ci.yml --branch main --limit 5
+./deploy/deliver.sh RUN_ID
+```
+
+`RUN_ID` is the numeric ID from the equipment repository's workflow run. Port forwarding needs to be restarted after the API pods are replaced. This is continuous integration with a manually started local delivery stage; it is not an internet-facing deployment or automatic deployment on every push.
+
 ## Equipment API
 
 | Method | Path | Operation |
@@ -91,7 +117,7 @@ The Minikube dashboard addon uses the archived Kubernetes Dashboard for this loc
 
 Asset registration accepts `assetTag`, `name`, `category`, `location`, and optional `description`. Asset tags are unique. Status updates accept `{"status":"maintenance"}` or `{"status":"operational"}`. Invalid input returns 400; unknown assets return 404; duplicate tags return 409.
 
-The interface forwards `/api/bookings` and `/api/availability` requests to the booking service. Direct service access is also supported. `X-Request-ID` correlates service logs; `X-Instance-ID` identifies the responding API instance. The Postman collection `BITS WILP CC Sem 3 Assign1` in `postman/` groups requests under Equipment Service and Booking Service, including catalogue, reservations, availability, validation, cancellation and health checks. `equipmentBaseUrl` defaults to `http://127.0.0.1:14180`; `bookingBaseUrl` defaults to `http://127.0.0.1:14181`. For Compose, use ports 4180 and 4181 respectively.
+The interface forwards `/api/bookings` and `/api/availability` requests to the booking service. Direct service access is also supported. `X-Request-ID` correlates service logs; `X-Instance-ID` identifies the responding API instance. The Postman collection `BITS WILP CC Sem 3 Assign1` in `postman/` groups requests under Equipment Service and Booking Service, including catalogue, reservations, availability, validation, cancellation and health checks. `equipmentBaseUrl` defaults to `http://127.0.0.1:14180`; `bookingBaseUrl` defaults to `http://127.0.0.1:14181`. For Compose, use ports 4180 and 4181 respectively. The collection refreshes an empty, invalid or past booking date while retaining a valid future selection. A full run creates an example asset and cancels its test reservation; asset and booking history remain in the database.
 
 ## Tests
 
